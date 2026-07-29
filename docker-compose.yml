@@ -1,0 +1,29 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: musicai-backend
+    expose:
+      - "8090"
+    volumes:
+      - ./output:/output
+      - ${HOME}/.aws:/root/.aws:ro
+      - ${SAGEMAKER_STATE_FILE:-/home/sami/musicAI/.sagemaker-state.json}:/config/sagemaker-state.json:ro
+    environment:
+      - AWS_PROFILE=${AWS_PROFILE:-musicai}
+      - AWS_REGION=${AWS_REGION:-eu-west-3}
+      - AWS_SDK_LOAD_CONFIG=1
+      - SAGEMAKER_STATE_FILE=/config/sagemaker-state.json
+      - WATCHDOG_IDLE_SECONDS=${WATCHDOG_IDLE_SECONDS:-90}
+      - SAGEMAKER_G5_XLARGE_USD_PER_HOUR=${SAGEMAKER_G5_XLARGE_USD_PER_HOUR:-1.80}
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: musicai-frontend
+    depends_on:
+      - backend
+    ports:
+      - "8091:80"
+    restart: unless-stopped

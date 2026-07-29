@@ -1,0 +1,15 @@
+# Python
+**/__pycache__/
+*.py[cod]
+.venv/
+
+# Configuration locale et identifiants
+.env
+.env.*
+.sagemaker-state.json
+
+# Fichiers générés localement
+output/
+
+# Sauvegardes de travail
+.backup-before-sagemaker-watchdog/

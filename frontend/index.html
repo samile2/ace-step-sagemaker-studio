@@ -1,0 +1,993 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#11100f">
+  <title>Studio MusicGen</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0e0d0c;
+      --surface: rgba(29, 27, 25, .88);
+      --surface-2: #25221f;
+      --line: rgba(255, 255, 255, .09);
+      --text: #f5f0e8;
+      --muted: #aaa198;
+      --accent: #ff6b35;
+      --accent-2: #ffb627;
+      --good: #67d79b;
+      --bad: #ff7b7b;
+      --radius: 20px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 12% 0%, rgba(255, 107, 53, .15), transparent 30rem),
+        radial-gradient(circle at 95% 20%, rgba(255, 182, 39, .08), transparent 26rem),
+        var(--bg);
+    }
+
+    body.server-loading .shell {
+      opacity: .16;
+      pointer-events: none;
+      filter: blur(3px);
+    }
+
+    .startup-screen {
+      position: fixed;
+      z-index: 100;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 50% 35%, rgba(255, 107, 53, .17), transparent 26rem),
+        rgba(14, 13, 12, .94);
+      transition: opacity .35s, visibility .35s;
+    }
+
+    .startup-screen[hidden] {
+      display: none;
+    }
+
+    .startup-card {
+      width: min(520px, 100%);
+      padding: 36px;
+      text-align: center;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: 0 28px 90px rgba(0, 0, 0, .45);
+    }
+
+    .startup-spinner {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 24px;
+      border: 4px solid rgba(255, 255, 255, .1);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .9s linear infinite;
+    }
+
+    .startup-card h2 {
+      margin-bottom: 12px;
+      font-size: 1.7rem;
+    }
+
+    .startup-card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .startup-state {
+      margin-top: 18px !important;
+      color: var(--accent-2) !important;
+      font-weight: 750;
+    }
+
+    .startup-spinner[hidden],
+    .start-server[hidden] {
+      display: none;
+    }
+
+    .start-server {
+      align-items: center;
+      justify-content: center;
+      min-width: 220px;
+      height: 52px;
+      margin-top: 24px;
+      padding: 0 24px;
+      color: #1a100a;
+      background: linear-gradient(135deg, var(--accent-2), var(--accent));
+      border: 0;
+      border-radius: 13px;
+      font-weight: 850;
+      cursor: pointer;
+      box-shadow: 0 10px 28px rgba(255, 107, 53, .23);
+    }
+
+    .start-server:hover:not(:disabled) {
+      transform: translateY(-2px);
+      filter: brightness(1.08);
+    }
+
+    .start-server:disabled {
+      cursor: wait;
+      opacity: .65;
+    }
+
+    button, input, textarea, select { font: inherit; }
+
+    .shell {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 54px 0 80px;
+    }
+
+    header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 34px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 0 0 auto;
+    }
+
+    .close-studio {
+      height: 40px;
+      padding: 0 14px;
+      color: #ffd1d1;
+      background: rgba(255, 90, 90, .1);
+      border: 1px solid rgba(255, 90, 90, .3);
+      border-radius: 999px;
+      font-size: .82rem;
+      font-weight: 750;
+      cursor: pointer;
+    }
+
+    .close-studio:hover:not(:disabled) {
+      background: rgba(255, 90, 90, .18);
+    }
+
+    .close-studio:disabled {
+      cursor: wait;
+      opacity: .55;
+    }
+
+    .close-studio[hidden] {
+      display: none;
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--accent-2);
+      font-size: .76rem;
+      font-weight: 800;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2.25rem, 6vw, 4.8rem);
+      line-height: .94;
+      letter-spacing: -.06em;
+    }
+
+    .subtitle {
+      max-width: 560px;
+      margin: 17px 0 0;
+      color: var(--muted);
+      font-size: 1.02rem;
+      line-height: 1.6;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      flex: 0 0 auto;
+      padding: 10px 14px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, .04);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: .84rem;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      background: var(--muted);
+      border-radius: 50%;
+      box-shadow: 0 0 0 4px rgba(255, 255, 255, .04);
+    }
+
+    .status.ready .dot { background: var(--good); box-shadow: 0 0 0 4px rgba(103, 215, 155, .12); }
+    .status.error .dot { background: var(--bad); box-shadow: 0 0 0 4px rgba(255, 123, 123, .12); }
+
+    .panel {
+      padding: clamp(20px, 4vw, 34px);
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: 0 26px 80px rgba(0, 0, 0, .24);
+      backdrop-filter: blur(16px);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 20px;
+    }
+
+    .field { display: grid; gap: 9px; }
+    .field.full { grid-column: 1 / -1; }
+
+    label {
+      color: #d8d1c9;
+      font-size: .86rem;
+      font-weight: 700;
+    }
+
+    input, textarea, select {
+      width: 100%;
+      color: var(--text);
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+    }
+
+    input, select { height: 48px; padding: 0 14px; }
+    textarea { min-height: 112px; padding: 14px; resize: vertical; line-height: 1.5; }
+    input[type="range"] {
+      height: 28px;
+      padding: 0;
+      accent-color: var(--accent);
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+    }
+    input:focus, textarea:focus, select:focus {
+      border-color: rgba(255, 107, 53, .8);
+      box-shadow: 0 0 0 3px rgba(255, 107, 53, .12);
+    }
+
+    .remix-panel {
+      display: grid;
+      grid-column: 1 / -1;
+      gap: 18px;
+      padding: 18px;
+      background: rgba(255, 107, 53, .07);
+      border: 1px solid rgba(255, 107, 53, .2);
+      border-radius: 14px;
+    }
+
+    .remix-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .remix-title { margin: 0; font-size: .9rem; }
+    .remix-source {
+      max-width: 650px;
+      margin: 4px 0 0;
+      overflow: hidden;
+      color: var(--muted);
+      font-size: .8rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .cancel-remix {
+      padding: 7px 10px;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      cursor: pointer;
+    }
+
+    .range-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .range-value {
+      color: var(--accent-2);
+      font-size: .8rem;
+      font-weight: 750;
+    }
+
+    .inline-fields {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .form-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      grid-column: 1 / -1;
+      padding-top: 6px;
+    }
+
+    .hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: .82rem;
+      line-height: 1.45;
+    }
+
+    .generate {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      min-width: 176px;
+      height: 50px;
+      padding: 0 22px;
+      color: #1a100a;
+      background: linear-gradient(135deg, var(--accent-2), var(--accent));
+      border: 0;
+      border-radius: 13px;
+      font-weight: 850;
+      cursor: pointer;
+      box-shadow: 0 10px 28px rgba(255, 107, 53, .23);
+      transition: transform .18s, filter .18s;
+    }
+
+    .generate:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.08); }
+    .generate:disabled { cursor: wait; filter: saturate(.45); opacity: .7; }
+
+    .spinner {
+      display: none;
+      width: 17px;
+      height: 17px;
+      border: 2px solid rgba(26, 16, 10, .3);
+      border-top-color: #1a100a;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+
+    .generate.loading .spinner { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .message {
+      display: none;
+      grid-column: 1 / -1;
+      padding: 13px 15px;
+      border-radius: 11px;
+      font-size: .9rem;
+    }
+
+    .message.show { display: block; }
+    .message.error { color: #ffd1d1; background: rgba(255, 90, 90, .1); border: 1px solid rgba(255, 90, 90, .22); }
+    .message.success { color: #ccffe2; background: rgba(76, 201, 132, .1); border: 1px solid rgba(76, 201, 132, .22); }
+
+    .library-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin: 44px 2px 18px;
+    }
+
+    h2 { margin: 0; font-size: 1.35rem; letter-spacing: -.025em; }
+    .count { color: var(--muted); font-size: .86rem; }
+
+    .tracks { display: grid; gap: 12px; }
+
+    .track {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(260px, 390px) auto;
+      align-items: center;
+      gap: 22px;
+      padding: 18px 20px;
+      background: rgba(28, 26, 24, .72);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+    }
+
+    .track-title {
+      margin: 0 0 7px;
+      overflow: hidden;
+      font-size: .98rem;
+      font-weight: 750;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .track-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px 12px;
+      color: var(--muted);
+      font-size: .76rem;
+    }
+
+    audio { width: 100%; height: 38px; color-scheme: dark; }
+
+    .track-actions { display: flex; gap: 8px; }
+
+    .download, .variant {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 40px;
+      padding: 0 13px;
+      color: var(--text);
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      font-size: .78rem;
+      font-weight: 750;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: border-color .2s, color .2s;
+    }
+
+    .variant { cursor: pointer; }
+    .download { width: 40px; padding: 0; }
+    .download:hover, .variant:hover { color: var(--accent-2); border-color: rgba(255, 182, 39, .45); }
+
+    .empty {
+      padding: 40px 20px;
+      color: var(--muted);
+      text-align: center;
+      border: 1px dashed var(--line);
+      border-radius: 16px;
+    }
+
+    @media (max-width: 760px) {
+      .shell { width: min(100% - 22px, 1120px); padding-top: 30px; }
+      header { align-items: flex-start; flex-direction: column; }
+      .form-grid, .inline-fields { grid-template-columns: 1fr; }
+      .field.full { grid-column: auto; }
+      .remix-panel { grid-column: auto; }
+      .form-footer { align-items: stretch; flex-direction: column; }
+      .generate { width: 100%; }
+      .track { grid-template-columns: 1fr auto; gap: 14px; }
+      .track audio { grid-column: 1 / -1; grid-row: 2; }
+      .track .track-actions { grid-column: 2; grid-row: 1; }
+      .variant { width: 40px; padding: 0; font-size: 0; }
+      .variant::before { content: "↻"; font-size: 1rem; }
+    }
+  </style>
+</head>
+<body class="server-loading">
+  <section class="startup-screen" id="startup-screen" aria-live="polite">
+    <div class="startup-card">
+      <div class="startup-spinner" id="startup-spinner"></div>
+      <h2 id="startup-title">Connexion au studio</h2>
+      <p id="startup-description">Vérification de l’état de SageMaker…</p>
+      <p class="startup-state" id="startup-state">Connexion à AWS…</p>
+      <button class="start-server" id="start-server" type="button" hidden>Démarrer SageMaker</button>
+    </div>
+  </section>
+
+  <main class="shell">
+    <header>
+      <div>
+        <p class="eyebrow">ACE-Step · SageMaker Async</p>
+        <h1>Créez votre son.</h1>
+        <p class="subtitle">Décrivez une ambiance, ajoutez vos paroles et laissez le GPU AWS générer le morceau. Toutes vos créations restent disponibles ici.</p>
+      </div>
+      <div class="header-actions">
+        <div class="status" id="status"><span class="dot"></span><span>Connexion…</span></div>
+        <button class="close-studio" id="close-studio" type="button" hidden>Fermer le studio</button>
+      </div>
+    </header>
+
+    <section class="panel">
+      <form id="generate-form" class="form-grid">
+        <div class="field full">
+          <label for="prompt">Description musicale</label>
+          <textarea id="prompt" name="prompt" required maxlength="2000" placeholder="Ex. French touch nocturne, basse ronde, synthés analogiques, montée progressive…"></textarea>
+        </div>
+
+        <div class="field">
+          <label for="lyrics-mode">Type de morceau</label>
+          <select id="lyrics-mode">
+            <option value="instrumental">Instrumental</option>
+            <option value="custom">Avec mes paroles</option>
+            <option value="automatic">Paroles automatiques</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="duration">Durée</label>
+          <select id="duration" name="duration_seconds">
+            <option value="30">30 secondes</option>
+            <option value="60">1 minute</option>
+            <option value="120">2 minutes</option>
+            <option value="180">3 minutes</option>
+            <option value="240">4 minutes</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="bpm">Tempo (BPM)</label>
+          <input id="bpm" name="bpm" type="number" min="30" max="300" placeholder="Auto">
+        </div>
+
+        <div class="field full" id="lyrics-field" hidden>
+          <label for="lyrics">Paroles</label>
+          <textarea id="lyrics" maxlength="4096" placeholder="[Verse]&#10;Écrivez vos paroles ici…&#10;&#10;[Chorus]"></textarea>
+        </div>
+
+        <div class="field full" id="language-field" hidden>
+          <div class="inline-fields">
+            <div class="field">
+              <label for="language">Langue de la voix</label>
+              <select id="language">
+                <option value="fr">Français</option>
+                <option value="en">Anglais</option>
+                <option value="es">Espagnol</option>
+                <option value="de">Allemand</option>
+                <option value="it">Italien</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="remix-panel" id="remix-panel" hidden>
+          <div class="remix-head">
+            <div>
+              <p class="remix-title">Créer une variante</p>
+              <p class="remix-source" id="remix-source"></p>
+            </div>
+            <button class="cancel-remix" id="cancel-remix" type="button">Annuler</button>
+          </div>
+
+          <div class="field">
+            <label for="modification">Modification demandée</label>
+            <textarea id="modification" maxlength="1000" placeholder="Ex. plus rapide, avec une batterie plus énergique et un refrain plus intense"></textarea>
+          </div>
+
+          <div class="field">
+            <div class="range-head">
+              <label for="cover-strength">Fidélité à l’original</label>
+              <span class="range-value" id="cover-strength-value">70 %</span>
+            </div>
+            <input id="cover-strength" type="range" min="0" max="1" step="0.05" value="0.7">
+            <p class="hint">Faible : transformation libre · Élevée : structure et mélodie plus proches.</p>
+          </div>
+        </div>
+
+        <div class="message" id="message" role="status"></div>
+
+        <div class="form-footer">
+          <p class="hint">La génération peut prendre plusieurs minutes selon la durée. Gardez cette page ouverte.</p>
+          <button class="generate" id="generate-button" type="submit">
+            <span class="spinner"></span>
+            <span class="button-label">Générer</span>
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <div class="library-head">
+      <h2>Vos générations</h2>
+      <span class="count" id="count"></span>
+    </div>
+    <section class="tracks" id="tracks"><div class="empty">Chargement de la bibliothèque…</div></section>
+  </main>
+
+  <script>
+    const form = document.querySelector("#generate-form");
+    const mode = document.querySelector("#lyrics-mode");
+    const lyricsField = document.querySelector("#lyrics-field");
+    const languageField = document.querySelector("#language-field");
+    const button = document.querySelector("#generate-button");
+    const buttonLabel = button.querySelector(".button-label");
+    const message = document.querySelector("#message");
+    const tracks = document.querySelector("#tracks");
+    const count = document.querySelector("#count");
+    const status = document.querySelector("#status");
+    const remixPanel = document.querySelector("#remix-panel");
+    const remixSourceLabel = document.querySelector("#remix-source");
+    const modification = document.querySelector("#modification");
+    const strength = document.querySelector("#cover-strength");
+    const strengthValue = document.querySelector("#cover-strength-value");
+    const startupScreen = document.querySelector("#startup-screen");
+    const startupState = document.querySelector("#startup-state");
+    const startupTitle = document.querySelector("#startup-title");
+    const startupDescription = document.querySelector("#startup-description");
+    const startupSpinner = document.querySelector("#startup-spinner");
+    const startButton = document.querySelector("#start-server");
+    const closeButton = document.querySelector("#close-studio");
+    // randomUUID n'est pas disponible dans tous les navigateurs lorsque la
+    // page est servie en HTTP sur le réseau local.
+    const sessionId = globalThis.crypto?.randomUUID?.()
+      || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    let generationIndex = new Map();
+    let remixSourceId = null;
+    let serverReady = false;
+    let startPending = false;
+    let studioClosed = false;
+    let closureSummary = null;
+
+    function escapeHtml(value) {
+      const node = document.createElement("div");
+      node.textContent = value ?? "";
+      return node.innerHTML;
+    }
+
+    function formatDate(value) {
+      return new Intl.DateTimeFormat("fr-FR", {
+        dateStyle: "medium",
+        timeStyle: "short"
+      }).format(new Date(value));
+    }
+
+    function formatSize(bytes) {
+      return `${(bytes / 1024 / 1024).toFixed(1).replace(".", ",")} Mo`;
+    }
+
+    function updateMode() {
+      const hasVoice = mode.value !== "instrumental";
+      lyricsField.hidden = mode.value !== "custom";
+      languageField.hidden = !hasVoice;
+    }
+
+    function stopRemix() {
+      remixSourceId = null;
+      remixPanel.hidden = true;
+      modification.value = "";
+      buttonLabel.textContent = "Générer";
+    }
+
+    function startRemix(id) {
+      const item = generationIndex.get(id);
+      if (!item) return;
+
+      remixSourceId = item.id;
+      remixPanel.hidden = false;
+      remixSourceLabel.textContent = item.prompt;
+      document.querySelector("#prompt").value = item.prompt;
+      document.querySelector("#duration").value = String(item.duration_seconds || 30);
+      document.querySelector("#bpm").value = item.bpm || "";
+      document.querySelector("#language").value = item.vocal_language || "fr";
+
+      if (item.lyrics === "[Instrumental]" || item.has_vocals === false) {
+        mode.value = "instrumental";
+      } else if (item.lyrics) {
+        mode.value = "custom";
+        document.querySelector("#lyrics").value = item.lyrics;
+      } else {
+        mode.value = "automatic";
+      }
+
+      strength.value = item.cover_strength ?? 0.7;
+      strengthValue.textContent = `${Math.round(Number(strength.value) * 100)} %`;
+      buttonLabel.textContent = "Créer la variante";
+      updateMode();
+      form.closest(".panel").scrollIntoView({ behavior: "smooth", block: "start" });
+      setTimeout(() => modification.focus(), 450);
+    }
+
+    function showMessage(text, type) {
+      message.textContent = text;
+      message.className = `message show ${type}`;
+    }
+
+    const statusLabels = {
+      Stopped: "Instance arrêtée",
+      Creating: "Création de l’instance GPU…",
+      Updating: "Mise à jour de l’endpoint…",
+      SystemUpdating: "Mise à jour du système…",
+      InService: "ACE-Step prêt",
+      Deleting: "Arrêt de l’instance…",
+      Failed: "Échec du démarrage"
+    };
+
+    function setServerReady(ready) {
+      serverReady = ready;
+      document.body.classList.toggle("server-loading", !ready);
+      startupScreen.hidden = ready;
+      button.disabled = !ready;
+      closeButton.hidden = !ready;
+    }
+
+    function formatRentalDuration(totalSeconds) {
+      const total = Math.max(0, Math.round(Number(totalSeconds) || 0));
+      const hours = Math.floor(total / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      const seconds = total % 60;
+      return `${hours} h ${String(minutes).padStart(2, "0")} min ${String(seconds).padStart(2, "0")} s`;
+    }
+
+    function renderClosedStudio(summary) {
+      setServerReady(false);
+      startupSpinner.hidden = true;
+      startButton.hidden = false;
+      startButton.textContent = "Rouvrir le studio";
+      startupTitle.textContent = "Studio fermé";
+
+      if (summary?.duration_seconds == null) {
+        startupDescription.textContent = "L’instance SageMaker était déjà arrêtée.";
+        startupState.textContent = "Aucun GPU n’est actuellement facturé.";
+        return;
+      }
+
+      const duration = formatRentalDuration(summary.duration_seconds);
+      const price = Number(summary.estimated_cost_usd).toFixed(2);
+      startupDescription.textContent = `Durée de location : ${duration}`;
+      startupState.textContent = `Prix estimé de la session : ~${price} USD`;
+    }
+
+    function updateStartup(statusValue, failureReason = "") {
+      const isStopped = statusValue === "Stopped";
+      const isFailed = statusValue === "Failed";
+
+      if (studioClosed && isStopped) {
+        renderClosedStudio(closureSummary);
+        return;
+      }
+
+      startupSpinner.hidden = isStopped || isFailed;
+      startButton.hidden = !isStopped;
+
+      if (isStopped) {
+        startButton.textContent = "Démarrer SageMaker";
+        startupTitle.textContent = "Studio GPU arrêté";
+        startupDescription.textContent = "La visite de cette page ne démarre rien automatiquement. Lancez SageMaker uniquement lorsque vous souhaitez générer de la musique.";
+        startupState.textContent = "Aucun GPU n’est actuellement facturé.";
+      } else if (isFailed) {
+        startupTitle.textContent = "Démarrage impossible";
+        startupDescription.textContent = "Consultez les logs du client web ou l’endpoint SageMaker.";
+        startupState.textContent = failureReason || "L’endpoint SageMaker est en échec.";
+      } else {
+        startupTitle.textContent = "Démarrage du studio GPU";
+        startupDescription.textContent = "SageMaker prépare l’instance et charge ACE-Step. Le démarrage prend généralement environ 8 minutes.";
+        startupState.textContent = statusLabels[statusValue] || statusValue;
+      }
+    }
+
+    async function heartbeat() {
+      try {
+        await fetch("/api/session/heartbeat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionId }),
+          keepalive: true
+        });
+      } catch {
+        // Le prochain heartbeat réessaiera automatiquement.
+      }
+    }
+
+    async function startServer() {
+      if (startPending) return;
+      studioClosed = false;
+      closureSummary = null;
+      startPending = true;
+      startButton.disabled = true;
+      startButton.hidden = true;
+      startupSpinner.hidden = false;
+      startupTitle.textContent = "Démarrage du studio GPU";
+      startupDescription.textContent = "Demande de création de l’endpoint SageMaker…";
+      startupState.textContent = "Envoi de la demande à AWS…";
+      try {
+        const response = await fetch("/api/server/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionId })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || "Démarrage impossible");
+      } finally {
+        startPending = false;
+        startButton.disabled = false;
+      }
+    }
+
+    async function closeStudio() {
+      if (!confirm("Fermer le studio et arrêter la facturation du GPU ?")) {
+        return;
+      }
+
+      closeButton.disabled = true;
+      button.disabled = true;
+      setServerReady(false);
+      startupSpinner.hidden = false;
+      startButton.hidden = true;
+      startupTitle.textContent = "Fermeture du studio";
+      startupDescription.textContent = "SageMaker supprime l’endpoint GPU…";
+      startupState.textContent = "Calcul du prix de la location en cours…";
+
+      try {
+        const response = await fetch("/api/server/stop", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionId })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || "Arrêt impossible");
+        studioClosed = true;
+        closureSummary = data;
+        renderClosedStudio(data);
+      } catch (error) {
+        startupSpinner.hidden = true;
+        startupTitle.textContent = "Fermeture impossible";
+        startupDescription.textContent = "L’endpoint n’a pas pu être supprimé.";
+        startupState.textContent = error.message;
+        await loadStatus();
+      } finally {
+        closeButton.disabled = false;
+      }
+    }
+
+    async function loadStatus() {
+      try {
+        const response = await fetch("/api/status", { cache: "no-store" });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || "Statut indisponible");
+
+        const label = statusLabels[data.status] || data.status;
+        status.className = `status ${data.ready ? "ready" : (data.status === "Failed" ? "error" : "")}`;
+        status.lastElementChild.textContent = label;
+        setServerReady(data.ready);
+        updateStartup(data.status, data.failure_reason);
+      } catch (error) {
+        setServerReady(false);
+        startupSpinner.hidden = true;
+        startButton.hidden = true;
+        startupTitle.textContent = "Connexion impossible";
+        startupDescription.textContent = "Le client web ne parvient pas à lire l’état de SageMaker.";
+        status.className = "status error";
+        status.lastElementChild.textContent = "Serveur indisponible";
+        startupState.textContent = error.message;
+      }
+    }
+
+    async function loadGenerations() {
+      try {
+        const response = await fetch("/generations", { cache: "no-store" });
+        if (!response.ok) throw new Error("Impossible de charger l’historique");
+        const data = await response.json();
+        generationIndex = new Map(data.generations.map(item => [item.id, item]));
+        count.textContent = `${data.generations.length} morceau${data.generations.length > 1 ? "x" : ""}`;
+
+        if (!data.generations.length) {
+          tracks.innerHTML = '<div class="empty">Aucun morceau pour le moment. Lancez votre première génération.</div>';
+          return;
+        }
+
+        tracks.innerHTML = data.generations.map(item => {
+          const details = [
+            formatDate(item.created_at),
+            item.duration_seconds ? `${item.duration_seconds} s` : null,
+            item.bpm ? `${item.bpm} BPM` : null,
+            item.has_vocals === true ? item.vocal_language?.toUpperCase() : (item.has_vocals === false ? "Instrumental" : null),
+            item.task_type === "cover" ? "Variante" : null,
+            formatSize(item.size_bytes)
+          ].filter(Boolean);
+
+          return `
+            <article class="track">
+              <div>
+                <p class="track-title" title="${escapeHtml(item.prompt)}">${escapeHtml(item.prompt)}</p>
+                <div class="track-meta">${details.map(detail => `<span>${escapeHtml(detail)}</span>`).join("")}</div>
+              </div>
+              <audio controls preload="metadata" src="${escapeHtml(item.file)}"></audio>
+              <div class="track-actions">
+                <a class="download" href="${escapeHtml(item.file)}" download="${escapeHtml(item.filename)}" title="Télécharger le MP3" aria-label="Télécharger">↓</a>
+              </div>
+            </article>`;
+        }).join("");
+      } catch (error) {
+        tracks.innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`;
+      }
+    }
+
+    mode.addEventListener("change", updateMode);
+    strength.addEventListener("input", () => {
+      strengthValue.textContent = `${Math.round(Number(strength.value) * 100)} %`;
+    });
+    document.querySelector("#cancel-remix").addEventListener("click", stopRemix);
+    tracks.addEventListener("click", event => {
+      const remixButton = event.target.closest("[data-remix-id]");
+      if (remixButton) startRemix(remixButton.dataset.remixId);
+    });
+
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      button.disabled = true;
+      closeButton.disabled = true;
+      button.classList.add("loading");
+      buttonLabel.textContent = "Génération…";
+      message.className = "message";
+
+      const lyrics = mode.value === "instrumental"
+        ? "[Instrumental]"
+        : mode.value === "automatic"
+          ? ""
+          : document.querySelector("#lyrics").value;
+
+      const params = new URLSearchParams({
+        prompt: document.querySelector("#prompt").value,
+        duration_seconds: document.querySelector("#duration").value,
+        lyrics,
+        vocal_language: document.querySelector("#language").value
+      });
+      const bpm = document.querySelector("#bpm").value;
+      if (bpm) params.set("bpm", bpm);
+      if (remixSourceId) {
+        params.set("remix_from", remixSourceId);
+        params.set("modification", modification.value);
+        params.set("cover_strength", strength.value);
+      }
+
+      try {
+        const response = await fetch(`/generate?${params}`, { method: "POST" });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || "La génération a échoué");
+        showMessage("Votre morceau est prêt et a été ajouté à la bibliothèque.", "success");
+        stopRemix();
+        await loadGenerations();
+        tracks.querySelector("audio")?.play().catch(() => {});
+      } catch (error) {
+        showMessage(error.message, "error");
+      } finally {
+        button.disabled = !serverReady;
+        closeButton.disabled = false;
+        button.classList.remove("loading");
+        buttonLabel.textContent = remixSourceId ? "Créer la variante" : "Générer";
+      }
+    });
+
+    window.addEventListener("pagehide", () => {
+      navigator.sendBeacon(
+        "/api/session/close",
+        new Blob(
+          [JSON.stringify({ session_id: sessionId })],
+          { type: "application/json" }
+        )
+      );
+    });
+
+    startButton.addEventListener("click", async () => {
+      try {
+        await startServer();
+        await loadStatus();
+      } catch (error) {
+        startupSpinner.hidden = true;
+        startButton.hidden = false;
+        startupState.textContent = error.message;
+      }
+    });
+    closeButton.addEventListener("click", closeStudio);
+
+    updateMode();
+    heartbeat();
+    loadStatus();
+    setInterval(heartbeat, 15000);
+    setInterval(loadStatus, 5000);
+    loadGenerations();
+  </script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+ARG ACESTEP_IMAGE=ghcr.io/ace-step/ace-step-1.5:0.1.8
+FROM ${ACESTEP_IMAGE}
+
+ENV ACESTEP_MODE=api \
+    ACESTEP_API_HOST=127.0.0.1 \
+    ACESTEP_API_PORT=8001 \
+    ACESTEP_CONFIG_PATH=acestep-v15-turbo \
+    ACESTEP_INIT_LLM=true \
+    ACESTEP_LM_MODEL_PATH=acestep-5Hz-lm-0.6B \
+    ACESTEP_LM_BACKEND=pt \
+    ACESTEP_CHECKPOINTS_DIR=/app/checkpoints \
+    ACESTEP_DOWNLOAD_SOURCE=huggingface \
+    ACESTEP_OFFLOAD_TO_CPU=true \
+    ACESTEP_LM_OFFLOAD_TO_CPU=true \
+    MODEL_INIT_TIMEOUT=3600 \
+    INVOCATION_TIMEOUT=3500
+
+# L'image officielle contient le code, mais télécharge normalement les poids
+# au premier lancement. Ils sont intégrés ici dans l'image ECR.
+RUN uv run acestep-download \
+    && uv run acestep-download \
+        --model acestep-5Hz-lm-0.6B \
+        --skip-main
+
+COPY app.py /app/sagemaker_app.py
+COPY sagemaker-entrypoint.sh /app/sagemaker-entrypoint.sh
+
+RUN chmod +x /app/sagemaker-entrypoint.sh
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=3 \
+    CMD curl -f http://127.0.0.1:8080/ping || exit 1
+
+# L'argument "serve" ajouté par SageMaker est volontairement ignoré.
+ENTRYPOINT ["/app/sagemaker-entrypoint.sh"]
